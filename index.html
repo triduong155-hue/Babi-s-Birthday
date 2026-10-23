@@ -458,7 +458,7 @@ function initAudio(){
   sfx = ctx.createGain(); sfx.gain.value = .6; sfx.connect(master);
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate);
   const d = noiseBuf.getChannelData(0); for (let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
-  loadMusic();
+  loadMusic(); setTimeout(() => loadVoice(), 4000);
 }
 const MV = .5;
 let musicBuf = null, musicSrc = null, musicOn = false, wantMusic = false;
@@ -993,10 +993,46 @@ async function speakLine(text){
   }
 }
 const clean = t => t.split('|').map(x => x.trim().replace(/^[>^~]/, '')).join(' ');
+
+// ----- recorded Universe voice (sprite) -----
+const VSEG = {"1": [0.0, 1.78], "2": [2.03, 1.68], "3": [3.96, 2.18], "4": [6.39, 3.08], "5": [9.72, 3.18], "6": [13.15, 2.68], "7": [16.08, 3.48], "8": [19.81, 2.58], "9": [22.64, 3.38], "10": [26.27, 2.38], "11": [28.9, 3.88], "12": [33.03, 2.98], "13": [36.26, 2.98], "14": [39.49, 3.58], "15": [43.32, 3.28], "16": [46.85, 1.78], "17": [48.88, 2.68], "18": [51.81, 2.68], "19": [54.74, 2.58], "20": [57.57, 3.68], "21": [61.5, 2.78], "22": [64.53, 1.98], "23": [66.76, 2.38], "24": [69.39, 3.08], "25": [72.72, 2.78], "26": [75.75, 2.88], "27": [78.88, 2.68], "28": [81.81, 3.18], "29": [85.239, 3.58], "30": [89.069, 2.08], "31": [91.399, 2.08], "32": [93.729, 2.08], "33": [96.059, 1.98], "34": [98.289, 4.38], "35": [102.919, 2.78], "36": [105.949, 2.88], "37": [109.079, 3.78], "38": [113.109, 2.28], "39": [115.639, 1.98], "40": [117.869, 1.98], "41": [120.099, 2.08], "42": [122.429, 3.28], "43": [125.959, 2.98], "44": [129.189, 2.18], "45": [131.619, 3.08], "46": [134.949, 3.38], "47": [138.579, 3.18], "48": [142.009, 4.08], "49": [146.339, 2.58], "50": [149.169, 3.18]};
+const VLINES = {"1": "Hello?", "2": "Mai?", "3": "Can you hear me?", "4": "Hi. Good. Loud and clear.", "5": "Who? The Universe. Obviously.", "6": "Good. Loud and clear.", "7": "Shy? That's fine. I'll do the talking.", "8": "This is the Universe.", "9": "Yes… the real one.", "10": "Be honest with me.", "11": "Did that video… make you cry?", "12": "I knew it. I see everything.", "13": "No? Your eyes say otherwise.", "14": "Laughing to hide the tears. Classic.", "15": "Hmm. Your face already answered.", "16": "Anyway.", "17": "I read your wish list.", "18": "It's… long.", "19": "Tree did all the work.", "20": "I'm only here for the dramatic voice.", "21": "One item is ready.", "22": "Want a hint?", "23": "Of course you do.", "24": "Too bad. You're getting one anyway.", "25": "Patience, birthday girl.", "26": "I'll take that as a yes.", "27": "It's… pink.", "28": "It plays… music.", "29": "And it sits… on your head.", "30": "Any guesses?", "31": "Who told you?!", "32": "Was it Tree?", "33": "It was Tree!", "34": "No. He doesn't sit on your head… Usually.", "35": "Close. But this one sings.", "36": "Warmer. Now put it on your head.", "37": "Interesting guess. Wrong. But interesting.", "38": "Current location…", "39": "his hands.", "40": "So, Mai…", "41": "look at Tree.", "42": "He's been holding it this whole time.", "43": "His arms are getting tired.", "44": "Happy birthday.", "45": "Universe… out.", "46": "Save that for him. He's right there.", "47": "You're welcome. Mostly him, though.", "48": "Yes?… Oh. You meant the expression.", "49": "Okay, okay.", "50": "Silence. I'll take that as a yes."};
+const vnorm = t => (t || '').toLowerCase().replace(/[’‘]/g, "'").replace(/trí/g, 'tree').replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const VMAP = {};
+Object.entries(VLINES).forEach(([id, t]) => { VMAP[vnorm(t)] = [+id]; });
+VMAP[vnorm('Who told you?! Was it Tree? It was Tree.')] = [31, 32, 33];
+let voiceBuf = null, voiceBus = null, voiceAn = null;
+function loadVoice(){
+  if (!ctx || voiceBuf) return;
+  const get = url => fetch(url).then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => ctx.decodeAudioData(b, res, rej)));
+  get('voice.m4a').catch(() => get('voice.ogg')).then(buf => { voiceBuf = buf; }).catch(() => {});
+}
+function voiceChain(){
+  if (voiceBus) return;
+  voiceBus = ctx.createGain(); voiceBus.gain.value = 1.5;
+  const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -20; comp.ratio.value = 3; comp.attack.value = .005; comp.release.value = .2;
+  voiceAn = ctx.createAnalyser(); voiceAn.fftSize = 512;
+  voiceBus.connect(comp); comp.connect(voiceAn); voiceAn.connect(master);
+}
+async function playVoice(ids){
+  voiceChain();
+  const buf = new Float32Array(voiceAn.fftSize); let on = true;
+  const pulse = () => { if (!on) return; voiceAn.getFloatTimeDomainData(buf); let m = 0; for (let i = 0; i < buf.length; i++) m = Math.max(m, Math.abs(buf[i]));
+    $('#halo').style.transform = `scale(${1 + Math.min(.22, m * .5)})`; requestAnimationFrame(pulse); };
+  pulse();
+  for (let i = 0; i < ids.length; i++){
+    const [off, dur] = VSEG[ids[i]]; const src = ctx.createBufferSource(); src.buffer = voiceBuf; src.connect(voiceBus);
+    src.start(0, off, dur);
+    await wait(Math.max(300, (dur - (i < ids.length - 1 ? .6 : .4)) * 1000));
+  }
+  on = false; $('#halo').style.transform = '';
+}
 async function line(text, icon, pauseAfter = 380){
-  subtitle(clean(text), icon);
-  await speakLine(text);
-  await wait(pauseAfter);
+  const shown = clean(text); subtitle(shown, icon);
+  const ids = VMAP[vnorm(shown)];
+  const rec = !!(voiceBuf && ids);
+  if (rec) await playVoice(ids); else await speakLine(text);
+  await wait(rec ? pauseAfter * .5 : pauseAfter);
 }
 
 // ----- listening -----
