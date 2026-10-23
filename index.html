@@ -318,14 +318,14 @@ body{font-family:Inter,system-ui,sans-serif;color:var(--ink);-webkit-user-select
 
   <!-- S4 chat -->
   <section class="screen" id="s4">
-    <div id="chatHead"><div class="av" id="headUni"></div><div><div class="t">Universe × anh Trí</div><div class="s">wish department</div></div></div>
+    <div id="chatHead"><div class="av" id="headUni"></div><div><div class="t">Universe × Trí</div><div class="s">wish department</div></div></div>
     <div id="chat"></div>
     <div id="openWrap"><button class="btn" id="openBtn">Open 🎁</button><div class="note">Volume up for this one.</div></div>
     <div id="tapHint">tap to continue</div>
     <div id="fwd"><div class="h2 serif" id="fwdT">Too big for the universe alone…</div>
       <div class="lane"><div class="env" id="fwdEnv">✉️</div><img src="tri.jpg" alt=""></div>
-      <div class="sub" id="fwdS">Forwarding to anh Trí…</div></div>
-    <div id="hf"><div class="pair"><img src="tri.jpg" alt=""><div class="uni" id="uniBig"></div></div><div class="lbl">TEAM: ANH TRÍ × UNIVERSE</div></div>
+      <div class="sub" id="fwdS">Forwarding to Trí…</div></div>
+    <div id="hf"><div class="pair"><img src="tri.jpg" alt=""><div class="uni" id="uniBig"></div></div><div class="lbl">TEAM: TRÍ × UNIVERSE</div></div>
     <div id="scrim"></div>
     <div id="sheet"><img class="av" src="mai.jpg" alt="Mai"><h2 class="h2 serif" id="sheetTitle">Mai, accept delivery?</h2>
       <div class="col" id="sheetRow"><button class="btn" id="accBtn">Accept</button><button class="btn ghost" id="acc2Btn">Accept, but act surprised</button></div></div>
@@ -748,7 +748,7 @@ function addMsg(who, html){
   const me = who === 'tri';
   const w = document.createElement('div'); w.className = 'msg ' + (me ? 'me' : 'them');
   const av = me ? '<img class="av" src="tri.jpg" alt="">' : `<div class="av">${uniSvg(46)}</div>`;
-  w.innerHTML = `${av}<div><div class="name">${me ? 'anh Trí' : 'Universe'}</div><div class="bub">${html}</div></div>`;
+  w.innerHTML = `${av}<div><div class="name">${me ? 'Trí' : 'Universe'}</div><div class="bub">${html}</div></div>`;
   chat.appendChild(w); while (chat.children.length > 5) chat.firstChild.remove();
   return w;
 }
@@ -764,7 +764,7 @@ async function startChat(){
   show('s4');
   const f = $('#fwd'); f.classList.add('on');
   await wait(1300); $('#fwdEnv').classList.add('go'); S.whoosh();
-  await wait(1400); $('#fwdS').textContent = 'Delivered ✓'; $('#fwdT').textContent = 'Forwarded to anh Trí.'; S.ting(); vib(20);
+  await wait(1400); $('#fwdS').textContent = 'Delivered ✓'; $('#fwdT').textContent = 'Forwarded to Trí.'; S.ting(); vib(20);
   const [x,y] = center($('#fwd img')); burst(x, y, 16, 70);
   await wait(1700); f.animate([{opacity:1},{opacity:0}],{duration:400,fill:'forwards'}); await wait(420); f.classList.remove('on');
   await say('tri', 'Hi Universe. Got a big wish from Mai.', '👋');
