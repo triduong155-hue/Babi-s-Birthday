@@ -596,7 +596,7 @@ $('#env').addEventListener('click', async () => {
   initAudio(); S.paper(); $('#env').classList.add('open'); vib(20);
   setTimeout(musicStart, 500);
   await wait(1500); show('s1'); setTimeout(S.pop, 200);
-  setTimeout(()=>{ vid.preload = 'auto'; try { vid.load(); } catch(e){} }, 2500);
+  setTimeout(()=>{ if (vid.paused && !vid.currentTime) { vid.preload = 'auto'; try { vid.load(); } catch(e){} } }, 2500);
 });
 
 /* ================= S1 Pout ID ================= */
@@ -916,7 +916,7 @@ vid.addEventListener('click', () => {
 });
 vid.addEventListener('waiting', () => { if (!vid.paused) { $('#loadHint').textContent = 'Wrapping your gift…'; $('#loadHint').style.display = 'block'; } });
 vid.addEventListener('playing', () => { $('#loadHint').style.display = 'none'; });
-vid.addEventListener('ended', () => { $('#endcard').classList.add('on'); tone('sine', 523, 0, 2.5, .15); scheduleCall(); });
+vid.addEventListener('ended', () => { if (!callDone && !callStarted) { scheduleCall(); } else { $('#endcard').classList.add('on'); tone('sine', 523, 0, 2.5, .15); } });
 $('#againBtn').addEventListener('click', () => { $('#endcard').classList.remove('on'); vid.currentTime = 0; vid.play(); });
 /* ================= S6 Universe call ================= */
 $('#incAv').innerHTML = uniSvg(118);
@@ -960,15 +960,15 @@ function subtitle(text, icon){
   st.animate([{opacity:0, transform:'translateY(8px)', filter:'blur(4px)'},{opacity:1, transform:'none', filter:'none'}], {duration:420, easing:'ease-out'});
   if (icon) si.animate([{transform:'scale(.3) rotate(-20deg)', opacity:0},{transform:'scale(1.25)', opacity:1, offset:.6},{transform:'scale(1)'}], {duration:520, easing:'cubic-bezier(.2,1.5,.4,1)'});
 }
-function speakLine(text){
+function sayChunk(text, rate, pitch, vol){
   return new Promise(res => {
     let done = false; const fin = () => { if (!done) { done = true; $('#halo').classList.remove('talk'); res(); } };
-    const est = 900 + text.length * 85;
+    const est = 700 + text.length * 80 / rate;
     if (!synth) { setTimeout(fin, est); return; }
     try {
-      const u = new SpeechSynthesisUtterance(text.replace(/[’‘]/g, "'").replace(/…/g, '... ').replace(/^\.\.\. /, ''));
+      const u = new SpeechSynthesisUtterance(text.replace(/[’‘]/g, "'").replace(/…/g, '... '));
       if (voice) u.voice = voice; u.lang = (voice && voice.lang) || 'en-GB';
-      u.rate = .78; u.pitch = .55; u.volume = 1;
+      u.rate = rate; u.pitch = pitch; u.volume = vol;
       let started = false;
       u.onstart = () => { started = true; $('#halo').classList.add('talk'); };
       u.onboundary = () => { $('#halo').animate([{transform:'scale(1.12)'},{transform:'scale(1)'}],{duration:260}); };
@@ -979,8 +979,22 @@ function speakLine(text){
     } catch(e){ setTimeout(fin, est); }
   });
 }
+// chunks separated by "|"; prefixes: ">" slow + deep (dramatic), "^" lighter + quicker (playful), "~" soft aside
+async function speakLine(text){
+  const parts = text.split('|').map(x => x.trim()).filter(Boolean);
+  for (let i = 0; i < parts.length; i++){
+    let t = parts[i], rate = .86, pitch = .62, vol = 1;
+    if (t[0] === '>') { t = t.slice(1); rate = .66; pitch = .42; }
+    else if (t[0] === '^') { t = t.slice(1); rate = 1.0; pitch = .9; }
+    else if (t[0] === '~') { t = t.slice(1); rate = .9; pitch = .7; vol = .75; }
+    if (/\?$/.test(t)) pitch += .08;
+    await sayChunk(t, rate, pitch, vol);
+    if (i < parts.length - 1) await wait(t.endsWith('…') || t.endsWith('...') ? 650 : 280);
+  }
+}
+const clean = t => t.split('|').map(x => x.trim().replace(/^[>^~]/, '')).join(' ');
 async function line(text, icon, pauseAfter = 380){
-  subtitle(text, icon);
+  subtitle(clean(text), icon);
   await speakLine(text);
   await wait(pauseAfter);
 }
@@ -1050,7 +1064,7 @@ function listen(options){
 const GLOBAL = [
   [['i love you','love you','love u'], 'Save that for him. He’s right there.', '💛'],
   [['thank you','thanks','thank'], 'You’re welcome. Mostly him, though.', '🙏'],
-  [['oh my god','omg','oh my gosh'], 'Yes? …Oh. You meant the expression.', '😇'],
+  [['oh my god','omg','oh my gosh'], '^Yes?|>…Oh.|You meant the expression.', '😇'],
 ];
 async function respond(res, branches, fallback){
   const t = norm(res.text);
@@ -1091,64 +1105,64 @@ async function runCall(){
   await wait(1600);
 
   // 1
-  await line('…Hello?', '📞', 500);
-  await line('Mai?', '🌌', 300);
-  await line('Can you hear me?', '👂', 100);
+  await line('^Hello?', '📞', 700);
+  await line('>Mai?', '🌌', 500);
+  await line('Can you|^hear me?', '👂', 100);
   let r = await listen(['Hi!', 'Who is this?']);
   await respond(r, [
     { k: ['hi','hello','hey','hiya','yes','yeah'], r: 'Hi. Good. Loud and clear.', i: '📡' },
-    { k: ['who','what','huh','wait','who is this'], r: 'Who? The Universe. Obviously.', i: '🌌' },
+    { k: ['who','what','huh','wait','who is this'], r: '^Who?|The Universe.|>Obviously.', i: '🌌' },
   ], { r: 'Good. Loud and clear.', i: '📡', silent: 'Shy? That’s fine. I’ll do the talking.' });
 
   // 2
-  await line('This is the Universe.', '✨', 500);
-  await line('Yes… the real one.', '🙂', 700);
-  await line('Be honest with me.', '🤨', 300);
-  await line('Did that video make you cry?', '🥲', 100);
+  await line('This is|>the Universe.', '✨', 700);
+  await line('>Yes…|^the real one.', '🙂', 800);
+  await line('~Be honest with me.', '🤨', 400);
+  await line('Did that video…|^make you cry?', '🥲', 100);
   r = await listen(['Yes 🥹', 'No, I’m fine', 'Haha']);
   await respond(r, [
-    { k: ['haha','lol','funny','laughing','hehe'], r: 'Laughing to hide the tears. Classic.', i: '😂' },
-    { k: ['no','nope','not','never','didn\'t','didnt','i\'m fine','im fine','fine'], r: 'No? Your eyes say otherwise.', i: '👀' },
+    { k: ['haha','lol','funny','laughing','hehe'], r: 'Laughing to hide the tears.|>Classic.', i: '😂' },
+    { k: ['no','nope','not','never','didn\'t','didnt','i\'m fine','im fine','fine'], r: '^No?|>Your eyes say otherwise.', i: '👀' },
     { k: ['yes','yeah','yep','a little','little','kind of','kinda','maybe','cry','crying','tears','so sweet','sweet','so cute','cute'], r: 'I knew it. I see everything.', i: '👁️' },
   ], { r: 'Hmm. Your face already answered.', i: '👁️' });
 
   // 3
-  await line('Anyway.', '📜', 300);
+  await line('^Anyway.', '📜', 400);
   await line('I read your wish list.', '📜', 300);
-  await line('It’s… long.', '📏', 600);
+  await line('It’s…|>long.', '📏', 800);
   await line('Trí did all the work.', '🛠️', 300);
-  await line('I’m only here for the dramatic voice.', '🎙️', 700);
+  await line('I’m only here|>for the dramatic voice.', '🎙️', 900);
   await line('One item is ready.', '🎁', 300);
-  await line('Want a hint?', '🤫', 100);
+  await line('~Want a hint?', '🤫', 100);
   r = await listen(['Yes!', 'No', 'Just tell me']);
   await respond(r, [
     { k: ['what is it','just tell me','tell me','show me','what'], r: 'Patience, birthday girl.', i: '⏳' },
-    { k: ['no','nope','don\'t','dont'], r: 'Too bad. You’re getting one anyway.', i: '😏' },
+    { k: ['no','nope','don\'t','dont'], r: '>Too bad.|^You’re getting one anyway.', i: '😏' },
     { k: ['yes','yeah','yep','please','sure','okay','ok','of course','hint'], r: 'Of course you do.', i: '😌' },
   ], { r: 'I’ll take that as a yes.', i: '😌' });
 
   // 4
-  await line('It’s pink.', '🎀', 500);
-  await line('It plays music.', '🎵', 500);
-  await line('And it sits on your head.', '🙆‍♀️', 700);
+  await line('It’s…|^pink.', '🎀', 600);
+  await line('It plays…|^music.', '🎵', 600);
+  await line('And it sits…|>on your head.', '🙆‍♀️', 800);
   await line('Any guesses?', '🤔', 100);
   r = await listen(['Headphones?', 'Trí?', 'A hat?']);
   const g = await respond(r, [
-    { k: ['headphone','headphones','headset','earphone','earphones','earbud','earbuds','beats','head phone','head phones'], r: '…Who told you?! Was it Trí? It was Trí.', i: '😳', id: 'right' },
-    { k: ['tri','trí','tree','tea','chee','tre'], r: 'No. He doesn’t sit on your head. …Usually.', i: '😅' },
+    { k: ['headphone','headphones','headset','earphone','earphones','earbud','earbuds','beats','head phone','head phones'], r: '>…Who told you?!|^Was it Trí?|>It was Trí.', i: '😳', id: 'right' },
+    { k: ['tri','trí','tree','tea','chee','tre'], r: 'No. He doesn’t sit on your head.|>…Usually.', i: '😅' },
     { k: ['hat','cap','crown','headband','hair clip','clip','bow','hairband'], r: 'Close. But this one sings.', i: '🎶' },
     { k: ['speaker','radio','phone','music'], r: 'Warmer. Now put it on your head.', i: '🔥' },
-  ], { r: 'Interesting guess. Wrong. But interesting.', i: '🧐' });
+  ], { r: 'Interesting guess.|>Wrong.|^But interesting.', i: '🧐' });
 
   // 5 outro
-  await line('Current location…', '📍', 600);
-  await line('his hands.', '👐', 800);
-  await line('So, Mai…', '🌌', 500);
-  await line('look at Trí.', '👀', 700);
+  await line('>Current location…', '📍', 800);
+  await line('^his hands.', '👐', 900);
+  await line('>So, Mai…', '🌌', 700);
+  await line('look at…|>Trí.', '👀', 900);
   await line('He’s been holding it this whole time.', '🎁', 300);
-  await line('His arms are getting tired.', '😮‍💨', 700);
-  await line('Happy birthday.', '🎂', 700);
-  await line('Universe… out.', '🎤', 300);
+  await line('~His arms are getting tired.', '😮‍💨', 800);
+  await line('>Happy birthday.', '🎂', 900);
+  await line('Universe…|>out.', '🎤', 300);
 
   // end
   clearInterval(clockTimer); droneStop(); hangupTone(); vib(80);
@@ -1164,7 +1178,7 @@ async function runCall(){
   callDone = true;
 }
 $('#replayBtn').addEventListener('click', () => { show('s5'); $('#endcard').classList.remove('on'); vid.currentTime = 0; vid.play(); });
-function scheduleCall(){ if (callDone || callStarted) return; setTimeout(() => { if (!callStarted) { if (synth) pickVoice(); showCall(''); } }, 5000); }
+function scheduleCall(){ if (callDone || callStarted) return; if (synth) pickVoice(); showCall(''); }
 
 })();
 </script>
